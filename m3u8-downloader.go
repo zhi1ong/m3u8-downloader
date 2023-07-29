@@ -272,7 +272,7 @@ func downloadTsFile(ts TsInfo, download_dir, key string, retries int) {
 
 // downloader m3u8 下载器
 func downloader(tsList []TsInfo, maxGoroutines int, downloadDir string, key string) {
-	retry := 5 //单个 ts 下载重试次数
+	retry := 20 //单个 ts 下载重试次数
 	var wg sync.WaitGroup
 	limiter := make(chan struct{}, maxGoroutines) //chan struct 内存占用 0 bool 占用 1
 	tsLen := len(tsList)
@@ -303,7 +303,7 @@ func checkTsDownDir(dir string) bool {
 
 // 合并ts文件
 func mergeTs(downloadDir string) string {
-	mvName := downloadDir + ".mp4"
+	mvName := downloadDir + ".ts"
 	outMv, _ := os.Create(mvName)
 	defer outMv.Close()
 	writer := bufio.NewWriter(outMv)
