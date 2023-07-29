@@ -11,6 +11,7 @@ import (
 	"crypto/cipher"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -44,6 +45,7 @@ var (
 	cFlag   = flag.String("c", "", "自定义请求cookie")
 	sFlag   = flag.Int("s", 0, "是否允许不安全的请求(默认0)")
 	spFlag  = flag.String("sp", "", "文件保存的绝对路径(默认为当前路径,建议默认值)")
+	fFlag   = flag.String("f", "", "批量下载, CSV 格式，无标题，Name,Url 一行一个")
 
 	logger *log.Logger
 	ro     = &grequests.RequestOptions{
@@ -69,14 +71,9 @@ func init() {
 }
 
 func main() {
-	Run()
-}
-
-func Run() {
 	msgTpl := "[功能]:多线程下载直播流m3u8视屏\n[提醒]:下载失败，请使用 -ht=apiv2 \n[提醒]:下载失败，m3u8 地址可能存在嵌套\n[提醒]:进度条中途下载失败，可重复执行"
 	fmt.Println(msgTpl)
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	now := time.Now()
 
 	// 1、解析命令行参数
 	flag.Parse()
@@ -87,6 +84,48 @@ func Run() {
 	cookie := *cFlag
 	insecure := *sFlag
 	savePath := *spFlag
+	filePath := *fFlag
+
+	if filePath != "" {
+		//	批量下载
+		fi, err := os.Open(filePath)
+		if err != nil {
+			fmt.Printf("Load m3u8 playlist error: %s\n", err)
+			return
+		}
+		defer fi.Close()
+
+		br := bufio.NewReader(fi)
+		line := 0
+		for {
+			a, _, c := br.ReadLine()
+			if c == io.EOF {
+				break
+			}
+
+			m3u8Info := strings.Split(string(a), ",")
+
+			if len(m3u8Info) != 2 {
+				break
+			}
+
+			line++
+			movieName = m3u8Info[0]
+			m3u8Url = m3u8Info[1]
+
+			fmt.Printf("开始下载：No.%d, 电影名 = %s, 链接 = %s\n", line, movieName, m3u8Url)
+
+			Run(m3u8Url, insecure, cookie, savePath, movieName, maxGoroutines, hostType)
+		}
+
+		fmt.Printf("全部视频下载完成，共计 %d 个\n", line)
+	} else {
+		Run(m3u8Url, insecure, cookie, savePath, movieName, maxGoroutines, hostType)
+	}
+}
+
+func Run(m3u8Url string, insecure int, cookie string, savePath string, movieName string, maxGoroutines int, hostType string) {
+	now := time.Now()
 
 	ro.Headers["Referer"] = getHost(m3u8Url, "apiv2")
 	if insecure != 0 {
